@@ -1,0 +1,334 @@
+import pygame, os
+import pyperclip
+
+pygame.init()
+pygame.font.init()
+dict_of_events = dict()
+
+
+class Button_2(pygame.surface.Surface):
+    def __init__(self, point, w, h, text):
+        self.point, self.w, self.h = point, w, h
+        super().__init__((w, h))
+        self.fill('#62888c')
+
+        font = pygame.font.SysFont(None, 20)
+        text_ = font.render(text, True, 'white')
+        self.blit(text_, (round((w - text_.get_width()) / 2), round((h - text_.get_height()) / 2)))
+
+        del font
+        del text_
+
+    def render(self):
+        screen.blit(self, self.point)
+
+    def belong(self, pos):
+        if self.point[0] < pos[0] < self.point[0] + self.w and self.point[1] < pos[1] < self.point[1] + self.h:
+            name_event = pygame.USEREVENT + 1
+            dict_of_events[name_event] = self.switch_off
+            pygame.time.set_timer(name_event, 100, 1)
+            self.set_alpha(125)
+            pyperclip.copy(control.field.text)
+
+    def switch_off(self):
+        self.set_alpha(255)
+
+    def move(self, x):
+        self.point = (x - self.w - 6, self.point[1])
+
+
+class EntryField():
+    def __init__(self, point, w, h):
+        self.point, self.w, self.h = point, w, h
+        self.surface = pygame.surface.Surface((w, h))
+        pygame.draw.rect(self.surface, '#6e6060', ((0, 0), (w, h)), width=3)
+
+        self.text = ''
+        self.activate = False
+
+    def belong(self, point):
+        if self.point[0] < point[0] < self.point[0] + self.w and self.point[1] < point[1] < self.point[
+            1] + self.h and not self.activate:
+            self.activate = True
+            self.surface.fill('black')
+            pygame.draw.rect(self.surface, '#178ce6', ((0, 0), (self.w, self.h)), width=3)
+            font = pygame.font.SysFont(None, 24)
+            text = font.render(self.text, True, '#178ce6')
+            if text.get_width() > self.w:
+                self.surface.blit(text, (self.w - 5 - text.get_width(), round((self.h - text.get_height()) / 2)))
+            else:
+                self.surface.blit(text, (5, round((self.h - text.get_height()) / 2)))
+        else:
+            self.activate = False
+            self.surface.fill('black')
+            pygame.draw.rect(self.surface, '#6e6060', ((0, 0), (self.w, self.h)), width=3)
+            font = pygame.font.SysFont(None, 24)
+            text = font.render(self.text, True, '#6e6060')
+            if text.get_width() > self.w:
+                self.surface.blit(text, (self.w - 5 - text.get_width(), round((self.h - text.get_height()) / 2)))
+            else:
+                self.surface.blit(text, (5, round((self.h - text.get_height()) / 2)))
+
+    def render(self):
+        screen.blit(self.surface, self.point)
+
+    def change_size(self, x):
+        self.w = x - 120
+        self.surface = pygame.surface.Surface((self.w, self.h))
+        if self.activate:
+            pygame.draw.rect(self.surface, '#178ce6', ((0, 0), (self.w, self.h)), width=3)
+            font = pygame.font.SysFont(None, 24)
+            text = font.render(self.text, True, '#178ce6')
+            if text.get_width() > self.w:
+                self.surface.blit(text, (self.w - 5 - text.get_width(), round((self.h - text.get_height()) / 2)))
+            else:
+                self.surface.blit(text, (5, round((self.h - text.get_height()) / 2)))
+
+            del font
+            del text
+        else:
+            pygame.draw.rect(self.surface, '#6e6060', ((0, 0), (self.w, self.h)), width=3)
+            font = pygame.font.SysFont(None, 24)
+            text = font.render(self.text, True, '#6e6060')
+            if text.get_width() > self.w:
+                self.surface.blit(text, (self.w - 5 - text.get_width(), round((self.h - text.get_height()) / 2)))
+            else:
+                self.surface.blit(text, (5, round((self.h - text.get_height()) / 2)))
+
+            del font
+            del text
+
+    def add_symbol(self, symbol, key):
+        if key == 8:
+            self.text = self.text[:-1]
+        else:
+            self.text += symbol
+        self.surface = pygame.surface.Surface((self.w, self.h))
+        pygame.draw.rect(self.surface, '#178ce6', ((0, 0), (self.w, self.h)), width=3)
+        font = pygame.font.SysFont(None, 24)
+        text = font.render(self.text, True, '#178ce6')
+        if text.get_width() > self.w:
+            self.surface.blit(text, (self.w - 5 - text.get_width(), round((self.h - text.get_height()) / 2)))
+        else:
+            self.surface.blit(text, (5, round((self.h - text.get_height()) / 2)))
+
+        del font
+        del text
+
+    def ctrl_v(self):
+        self.text = pyperclip.paste()
+        self.surface.fill('black')
+        pygame.draw.rect(self.surface, '#178ce6', ((0, 0), (self.w, self.h)), width=3)
+        font = pygame.font.SysFont(None, 24)
+        text = font.render(self.text, True, '#178ce6')
+        if text.get_width() > self.w:
+            self.surface.blit(text, (self.w - 5 - text.get_width(), round((self.h - text.get_height()) / 2)))
+        else:
+            self.surface.blit(text, (5, round((self.h - text.get_height()) / 2)))
+
+
+class OutputField():
+    def __init__(self, point, w, h):
+        self.shift_ = True
+        self.point, self.w, self.h = point, w, h
+        self.surface = pygame.surface.Surface((w, h))
+        pygame.draw.rect(self.surface, '#6e6060', ((0, 0), (self.w, self.h)), width=3)
+
+        self.text = ''
+
+    def set_text(self):
+        pass
+
+    def render(self):
+        screen.blit(self.surface, self.point)
+
+    def belong(self, pos):
+        if self.point[0] < pos[0] < self.point[0] + self.w and self.point[1] < pos[1] < self.point[1] + self.h:
+            self.shift()
+
+    def shift(self):
+        self.shift_ = not self.shift_
+        self.surface.fill('black')
+        pygame.draw.rect(self.surface, '#6e6060' if self.shift_ else '#f54e4e', ((0, 0), (self.w, self.h)), width=3)
+        font = pygame.font.SysFont(None, 24)
+        text = font.render(self.text, True, '#6e6060' if self.shift_ else '#f54e4e')
+        if text.get_width() > self.w:
+            self.surface.blit(text, (self.w - 5 - text.get_width(), round((self.h - text.get_height()) / 2)))
+        else:
+            self.surface.blit(text, (5, round((self.h - text.get_height()) / 2)))
+
+    def change_size(self, x):
+        self.w = x - 120
+        self.surface = pygame.surface.Surface((self.w, self.h))
+        pygame.draw.rect(self.surface, '#6e6060' if self.shift_ else '#f54e4e', ((0, 0), (self.w, self.h)), width=3)
+
+    def ctrl_c(self):
+        pyperclip.copy(self.text)
+
+
+class Button():
+    def __init__(self, point, w, h, text):
+        self.point = point
+        self.w, self.h = w, h
+
+        font = pygame.font.SysFont(None, 20)
+
+        self.stand = pygame.surface.Surface((w, h))
+        self.stand.fill('#508783')
+        stand_text = font.render(text, True, 'white')
+        self.stand.blit(stand_text, (round((w - stand_text.get_width()) / 2), round((h - stand_text.get_height()) / 2)))
+
+        self.hover = pygame.surface.Surface((w, h))
+        self.hover.fill('#3d6361')
+        hover_text = font.render(text, True, 'white')
+        self.hover.blit(hover_text, (round((w - hover_text.get_width()) / 2), round((h - hover_text.get_height()) / 2)))
+
+        self.press = pygame.surface.Surface((w, h))
+        self.press.fill('#22302f')
+        press_text = font.render(text, True, 'white')
+        self.press.blit(press_text, (round((w - press_text.get_width()) / 2), round((h - press_text.get_height()) / 2)))
+
+        self.current_surface = self.stand
+
+        del font
+        del stand_text
+        del hover_text
+        del press_text
+
+    def render(self):
+        screen.blit(self.current_surface, self.point)
+
+    def update(self, pos, clicked=False):
+        if (self.point[0] < pos[0] < self.point[0] + self.w) and (self.point[1] < pos[1] < self.point[1] + self.h):
+            if clicked:
+                control.scheme.set_stand()
+                control.sputnik.set_stand()
+                control.hybrid.set_stand()
+
+                self.current_surface = self.press
+
+            elif self.current_surface != self.press:
+                self.current_surface = self.hover
+
+        elif self.current_surface == self.press:
+            pass
+        else:
+            self.current_surface = self.stand
+
+    def set_stand(self):
+        self.current_surface = self.stand
+
+    def move(self, x):
+        self.point = (x - 100, self.point[1])
+
+
+class Map():
+    def __init__(self):
+        self.output = OutputField((6, 42), 380, 30)
+        self.search = Button_2((400, 6), 94, 30, 'Искать')
+        self.reset = Button_2((400, 42), 94, 30, 'Обнулить')
+        self.field = EntryField((6, 6), 380, 30)
+        self.scheme = Button((400, 0 + 78), 94, 30, 'Схема')
+        self.sputnik = Button((400, 30 + 78), 94, 30, 'Спутник')
+        self.hybrid = Button((400, 60 + 78), 94, 30, 'Гибрид')
+
+    def update(self, pos):
+        self.scheme.update(pos)
+        self.sputnik.update(pos)
+        self.hybrid.update(pos)
+
+    def clicked(self, pos):
+        self.output.belong(pos)
+        self.reset.belong(pos)
+        self.search.belong(pos)
+        self.field.belong(pos)
+        self.scheme.update(pos, True)
+        self.sputnik.update(pos, True)
+        self.hybrid.update(pos, True)
+
+    def render(self):
+        self.output.render()
+        self.reset.render()
+        self.search.render()
+        self.field.render()
+        self.scheme.render()
+        self.sputnik.render()
+        self.hybrid.render()
+
+    def change_window(self, size):
+        self.output.change_size(size[0])
+        self.reset.move(size[0])
+        self.search.move(size[0])
+        self.field.change_size(size[0])
+        self.scheme.move(size[0])
+        self.sputnik.move(size[0])
+        self.hybrid.move(size[0])
+
+    def key_PgUp(self):
+        pass
+
+    def key_PgDown(self):
+        pass
+
+    def key_down(self):
+        print('down')
+        pass
+
+    def key_up(self):
+        print('up')
+        pass
+
+    def key_right(self):
+        print('right')
+        pass
+
+    def key_left(self):
+        print('left')
+        pass
+
+
+if __name__ == '__main__':
+    control = Map()
+    time_ = pygame.time.Clock()
+    screen = pygame.display.set_mode((500, 500), pygame.RESIZABLE)
+
+    while True:
+        screen.fill('black')
+
+        control.update(pygame.mouse.get_pos())
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                raise SystemExit
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                control.clicked(event.pos)
+            elif event.type == pygame.VIDEORESIZE:
+                screen = pygame.display.set_mode(
+                    (pygame.math.clamp(event.w, 300, 10000), pygame.math.clamp(event.h, 300, 10000)), pygame.RESIZABLE)
+                control.change_window(screen.get_size())
+            elif event.type == pygame.KEYDOWN:
+                if event.key == 99 and event.mod == 4160:
+                    control.output.ctrl_c()  # ctrl + c
+                elif event.key == 118 and event.mod == 4160 and control.field.activate:
+                    control.field.ctrl_v()  # ctrl + v
+                elif event.key == 1073741899:
+                    control.key_PgUp()  # pg up
+                elif event.key == 1073741902:
+                    control.key_PgDown()  # pg dn
+                elif event.key == 1073741905:
+                    control.key_down()  # Стрелка вниз
+                elif event.key == 1073741906:
+                    control.key_up()  # Стрелка верх
+                elif event.key == 1073741904:
+                    control.key_left()  # Стрелка влево
+                elif event.key == 1073741903:
+                    control.key_right()  # Стрелка вправо
+                elif control.field.activate:
+                    control.field.add_symbol(event.unicode, event.key)
+            elif event.type in dict_of_events:
+                dict_of_events[event.type]()
+
+        control.render()
+        pygame.display.update()
+        time_.tick(50)
