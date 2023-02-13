@@ -1,13 +1,84 @@
-import pygame, os
+import pygame
 import pyperclip
+import threading
+import math
+import requests
+import io
 
 pygame.init()
 pygame.font.init()
 dict_of_events = dict()
+global_dest = 'sat,skl'
+
+
+class Board:
+    def __init__(self):
+        self.left, self.top, self.cell_size = 0, 0, 450
+        self.centr_left, self.centr_top = 0, 0
+        indefinitely = pygame.surface.Surface((450, 450))  # 200 - 450
+        pygame.draw.rect(indefinitely, '#a7a8a7', ((0, 0), (450, 450)), width=1)
+
+        self.board = [[indefinitely for j in range(5)] for i in range(5)]
+        self.fake_board = [[j for j in i] for i in self.board]
+
+    def target(self, offset):
+        self.centr_left = pygame.math.clamp(offset[0] + self.centr_left, -2, 2)
+        self.centr_top = pygame.math.clamp(offset[1] + self.centr_top, -2, 2)
+
+    def render(self):
+        for i in range(5):
+            for j in range(5):
+                screen.blit(self.fake_board[i][j], (self.left + self.cell_size * i + self.cell_size * self.centr_left, self.top + self.cell_size * 4 - self.cell_size * j + self.cell_size * self.centr_top))
+                if i - 2 == -self.centr_left and j == self.centr_top + 2:
+                    pygame.draw.rect(screen, 'red', ((self.left + self.cell_size * i + self.cell_size * self.centr_left, self.top + self.cell_size * 4 - self.cell_size * j + self.cell_size * self.centr_top), (self.cell_size, self.cell_size)), width=2)
+
+    def to_position(self):
+        self.left, self.top = round(pygame.display.get_surface().get_width() / 2 - (5 * self.cell_size) / 2), round(pygame.display.get_surface().get_height() / 2 - (5 * self.cell_size) / 2)
+
+    def get_click(self, pos, button):
+        if button == 1:
+            pass
+        elif button == 3:
+            pass
+
+    def scale(self, offset):
+        self.cell_size = pygame.math.clamp(self.cell_size + offset, 150, 550)
+        self.fake_board = [[pygame.transform.scale(j, (self.cell_size, self.cell_size)) for j in i] for i in self.board]
+        self.to_position()
+
+    def get_cell(self, mouse_move):
+        x, y = mouse_move
+        if not (self.left < x < self.left + self.cell_size * self.width) or not (
+                self.top < y < self.top + self.cell_size * self.height):
+            return None
+
+        x -= self.left
+        y -= self.top
+
+        x /= self.cell_size
+        y /= self.cell_size
+
+        x = math.ceil(x) - 1
+        y = math.ceil(y) - 1
+        return (x, y)
+
+    def set_value_to_cell(self, surface, i, j):
+        self.board[i][j] = surface
+        self.fake_board[i][j] = pygame.transform.scale(self.board[i][j], (self.cell_size, self.cell_size))
+
+    def set_default(self):
+        indefinitely = pygame.surface.Surface((450, 450))  # 200 - 450
+        pygame.draw.rect(indefinitely, '#a7a8a7', ((0, 0), (450, 450)), width=1)
+
+        self.board = [[indefinitely for j in range(5)] for i in range(5)]
+        self.fake_board = [[pygame.transform.scale(j, (self.cell_size, self.cell_size)) for j in i] for i in self.board]
+        self.left, self.top, self.centr_left, self.centr_top = 0, 0, 0, 0
+        self.to_position()
 
 
 class Button_2(pygame.surface.Surface):
-    def __init__(self, point, w, h, text):
+    def __init__(self, point, w, h, text, func):
+        self.func = func
         self.point, self.w, self.h = point, w, h
         super().__init__((w, h))
         self.fill('#62888c')
@@ -28,13 +99,16 @@ class Button_2(pygame.surface.Surface):
             dict_of_events[name_event] = self.switch_off
             pygame.time.set_timer(name_event, 100, 1)
             self.set_alpha(125)
-            pyperclip.copy(control.field.text)
+            self.func_()
 
     def switch_off(self):
         self.set_alpha(255)
 
     def move(self, x):
         self.point = (x - self.w - 6, self.point[1])
+
+    def func_(self):
+        self.func()
 
 
 class EntryField():
@@ -135,9 +209,13 @@ class OutputField():
         pygame.draw.rect(self.surface, '#6e6060', ((0, 0), (self.w, self.h)), width=3)
 
         self.text = ''
+        self.index = ''
 
-    def set_text(self):
-        pass
+    def set_text(self, adress, index):
+        self.text = adress
+        self.index = index
+        self.shift_ = not self.shift_
+        self.shift()
 
     def render(self):
         screen.blit(self.surface, self.point)
@@ -151,7 +229,7 @@ class OutputField():
         self.surface.fill('black')
         pygame.draw.rect(self.surface, '#6e6060' if self.shift_ else '#f54e4e', ((0, 0), (self.w, self.h)), width=3)
         font = pygame.font.SysFont(None, 24)
-        text = font.render(self.text, True, '#6e6060' if self.shift_ else '#f54e4e')
+        text = font.render(self.text if not self.shift_ else self.text + ', ' + self.index, True, '#6e6060' if self.shift_ else '#f54e4e')
         if text.get_width() > self.w:
             self.surface.blit(text, (self.w - 5 - text.get_width(), round((self.h - text.get_height()) / 2)))
         else:
@@ -161,16 +239,19 @@ class OutputField():
         self.w = x - 120
         self.surface = pygame.surface.Surface((self.w, self.h))
         pygame.draw.rect(self.surface, '#6e6060' if self.shift_ else '#f54e4e', ((0, 0), (self.w, self.h)), width=3)
+        self.shift_ = not self.shift_
+        self.shift()
 
     def ctrl_c(self):
-        pyperclip.copy(self.text)
+        print(self.text if not self.shift_ else self.text + ', ' + self.index)
+        pyperclip.copy(self.text if not self.shift_ else self.text + ', ' + self.index)
 
 
 class Button():
-    def __init__(self, point, w, h, text):
+    def __init__(self, point, w, h, text, dest):
         self.point = point
         self.w, self.h = w, h
-
+        self.dest = dest
         font = pygame.font.SysFont(None, 20)
 
         self.stand = pygame.surface.Surface((w, h))
@@ -198,14 +279,18 @@ class Button():
     def render(self):
         screen.blit(self.current_surface, self.point)
 
-    def update(self, pos, clicked=False):
-        if (self.point[0] < pos[0] < self.point[0] + self.w) and (self.point[1] < pos[1] < self.point[1] + self.h):
-            if clicked:
+    def update(self, pos, clicked=False, liberty=False):
+        if ((self.point[0] < pos[0] < self.point[0] + self.w) and (self.point[1] < pos[1] < self.point[1] + self.h)) or liberty:
+            if clicked or liberty:
+                global global_dest
+                global_dest = self.dest
+
                 control.scheme.set_stand()
                 control.sputnik.set_stand()
                 control.hybrid.set_stand()
 
                 self.current_surface = self.press
+                search_1()
 
             elif self.current_surface != self.press:
                 self.current_surface = self.hover
@@ -222,15 +307,43 @@ class Button():
         self.point = (x - 100, self.point[1])
 
 
+def card(card, text):
+    param = {"apikey": "40d1649f-0493-4b70-98ba-98533de7710b", "geocode": text, "format": "json"}
+    req = requests.get("http://geocode-maps.yandex.ru/1.x/", params=param)
+    adress = req.json()["response"]["GeoObjectCollection"]["featureMember"][0]["GeoObject"]["metaDataProperty"]["GeocoderMetaData"]["Address"]
+    try:
+        control.output.set_text(adress['formatted'], adress['postal_code'])
+    except Exception:
+        control.output.set_text(adress['formatted'], '')
+    coord = req.json()["response"]["GeoObjectCollection"]["featureMember"][0]["GeoObject"]["Point"]["pos"]
+    coord = tuple(map(float, coord.split(' ')))
+    a, b = 0.0005 * 1.21, 0.0005 * 1
+    param = {'l': card, 'spn': f'{a},{b}', 'size': '450,450', 'pt': f'{coord[0]},{coord[1]},pm2gnl'}
+    for i in range(-2, 3):
+        for j in range(-2, 3):
+            param['ll'] = str(coord[0] + a * 2 * i) + ',' + str(coord[1] + b * 2 * j * 0.6)
+            response = requests.get('http://static-maps.yandex.ru/1.x/', params=param)
+            control.content.set_value_to_cell(pygame.image.load(io.BytesIO(response.content)), i + 2, j + 2)
+
+
+def search_1():
+     threading.Thread(target=card, args=(global_dest, control.field.text), name='thr-1').start()
+
+def void():
+    control.content.set_default()
+    control.field.text = ''
+    control.output.text = ''
+
 class Map():
     def __init__(self):
+        self.content = Board()
         self.output = OutputField((6, 42), 380, 30)
-        self.search = Button_2((400, 6), 94, 30, 'Искать')
-        self.reset = Button_2((400, 42), 94, 30, 'Обнулить')
+        self.search = Button_2((400, 6), 94, 30, 'Искать', search_1)
+        self.reset = Button_2((400, 42), 94, 30, 'Обнулить', void)
         self.field = EntryField((6, 6), 380, 30)
-        self.scheme = Button((400, 0 + 78), 94, 30, 'Схема')
-        self.sputnik = Button((400, 30 + 78), 94, 30, 'Спутник')
-        self.hybrid = Button((400, 60 + 78), 94, 30, 'Гибрид')
+        self.scheme = Button((400, 0 + 78), 94, 30, 'Схема', 'map')
+        self.sputnik = Button((400, 30 + 78), 94, 30, 'Спутник', 'sat')
+        self.hybrid = Button((400, 60 + 78), 94, 30, 'Гибрид', 'sat,skl')
 
     def update(self, pos):
         self.scheme.update(pos)
@@ -247,6 +360,7 @@ class Map():
         self.hybrid.update(pos, True)
 
     def render(self):
+        self.content.render()
         self.output.render()
         self.reset.render()
         self.search.render()
@@ -256,6 +370,7 @@ class Map():
         self.hybrid.render()
 
     def change_window(self, size):
+        self.content.to_position()
         self.output.change_size(size[0])
         self.reset.move(size[0])
         self.search.move(size[0])
@@ -265,38 +380,35 @@ class Map():
         self.hybrid.move(size[0])
 
     def key_PgUp(self):
-        pass
+        self.content.scale(-50)
 
     def key_PgDown(self):
-        pass
+        self.content.scale(50)
 
     def key_down(self):
-        print('down')
-        pass
+        self.content.target((0, -1))
 
     def key_up(self):
-        print('up')
-        pass
+        self.content.target((0, 1))
 
     def key_right(self):
-        print('right')
-        pass
+        self.content.target((-1, 0))
 
     def key_left(self):
-        print('left')
-        pass
+        self.content.target((1, 0))
 
 
 if __name__ == '__main__':
     control = Map()
+    control.hybrid.update((0, 0), True, liberty=True)
     time_ = pygame.time.Clock()
     screen = pygame.display.set_mode((500, 500), pygame.RESIZABLE)
+    control.content.to_position()
 
     while True:
         screen.fill('black')
 
         control.update(pygame.mouse.get_pos())
-
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
@@ -305,12 +417,12 @@ if __name__ == '__main__':
                 control.clicked(event.pos)
             elif event.type == pygame.VIDEORESIZE:
                 screen = pygame.display.set_mode(
-                    (pygame.math.clamp(event.w, 300, 10000), pygame.math.clamp(event.h, 300, 10000)), pygame.RESIZABLE)
+                    (pygame.math.clamp(event.w, 500, 10000), pygame.math.clamp(event.h, 500, 10000)), pygame.RESIZABLE)
                 control.change_window(screen.get_size())
             elif event.type == pygame.KEYDOWN:
-                if event.key == 99 and event.mod == 4160:
+                if event.key == 99 and event.mod in [64, 4160]:
                     control.output.ctrl_c()  # ctrl + c
-                elif event.key == 118 and event.mod == 4160 and control.field.activate:
+                elif event.key == 118 and event.mod in [64, 4160] and control.field.activate:
                     control.field.ctrl_v()  # ctrl + v
                 elif event.key == 1073741899:
                     control.key_PgUp()  # pg up
